@@ -28,3 +28,16 @@ priv/repo/migrations
 
 # ignore elixir LS cache
 .elixir_ls
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
+
+# local elixir
+.nix-hex
+.nix-mix
