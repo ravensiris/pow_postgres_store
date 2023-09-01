@@ -7,7 +7,7 @@ defmodule PowPostgresStore.MixProject do
       version: "1.0.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
-      elixirc_paths: elixirc_paths(Mix.env),
+      elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       package: package(),
       description: "Postgres-backed cache backend for pow",
@@ -37,12 +37,15 @@ defmodule PowPostgresStore.MixProject do
     [
       {:pow, ">= 1.0.0"},
       {:ecto_sql, ">= 3.0.0"},
-      {:postgrex, "~> 0.15.3", only: :test},
-      {:ex_doc, "> 0.0.0", only: :dev, runtime: false}
+      {:postgrex, "~> 0.17.3", only: :test},
+      {:ex_doc, "> 0.0.0", only: :dev, runtime: false},
+      # pow requires phoenix & live_view
+      {:phoenix, "~> 1.7"},
+      {:phoenix_live_view, "~> 0.19.5"}
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib","test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp package() do
@@ -50,7 +53,7 @@ defmodule PowPostgresStore.MixProject do
       licenses: ["MIT"],
       links: %{
         "GitHub" => "https://github.com/ZennerIoT/pow_postgres_store"
-      },
+      }
     ]
   end
 end
