@@ -13,20 +13,23 @@ defmodule Pow.Postgres.Store do
     schema = schema()
     namespace = namespace(config)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    expires_at = case Config.get(config, :ttl) do
-      nil ->
-        nil
 
-      ttl when is_integer(ttl) ->
-        now
-        |> DateTime.add(ttl, :millisecond)
-        |> DateTime.truncate(:second)
-    end
+    expires_at =
+      case Config.get(config, :ttl) do
+        nil ->
+          nil
+
+        ttl when is_integer(ttl) ->
+          now
+          |> DateTime.add(ttl, :millisecond)
+          |> DateTime.truncate(:second)
+      end
 
     records =
       List.wrap(record)
       |> Enum.map(fn {original_key, value} ->
         key = List.wrap(original_key)
+
         [
           namespace: namespace,
           key: Enum.map(key, &:erlang.term_to_binary/1),
@@ -34,16 +37,17 @@ defmodule Pow.Postgres.Store do
           value: :erlang.term_to_binary(value),
           expires_at: expires_at,
           inserted_at: now,
-          updated_at: now,
+          updated_at: now
         ]
       end)
 
     case repo().insert_all(
-        schema,
-        records,
-        on_conflict: {:replace, [:value, :expires_at, :updated_at]},
-        conflict_target: [:namespace, :original_key]
-      ) do
+           schema,
+           records,
+           on_conflict: {:replace, [:value, :expires_at, :updated_at]},
+           conflict_target: [:namespace, :original_key],
+           prefix: prefix()
+         ) do
       {_rows, _entries} -> :ok
     end
   end
@@ -55,7 +59,7 @@ defmodule Pow.Postgres.Store do
       |> filter_key(key)
       |> filter_namespace(config)
 
-    case repo().delete_all(query) do
+    case repo().delete_all(query, prefix: prefix()) do
       {_rows, _} ->
         :ok
     end
@@ -67,7 +71,7 @@ defmodule Pow.Postgres.Store do
       schema()
       |> filter_expired()
 
-    case repo().delete_all(query) do
+    case repo().delete_all(query, prefix: prefix()) do
       {_rows, _} ->
         :ok
     end
@@ -82,7 +86,7 @@ defmodule Pow.Postgres.Store do
       |> reject_expired()
       |> select_value()
 
-    case repo().one(query) do
+    case repo().one(query, prefix: prefix()) do
       nil ->
         :not_found
 
@@ -100,7 +104,7 @@ defmodule Pow.Postgres.Store do
       |> reject_expired()
       |> select_record()
 
-    repo().all(query)
+    repo().all(query, prefix: prefix())
     |> Enum.map(&decode_record/1)
   end
 
@@ -120,6 +124,10 @@ defmodule Pow.Postgres.Store do
     Keyword.get(config(), :schema, Pow.Postgres.Schema)
   end
 
+  defp prefix() do
+    Keyword.get(config(), :prefix, "public")
+  end
+
   def filter_namespace(query, config) do
     where(query, [s], s.namespace == ^namespace(config))
   end
@@ -136,14 +144,17 @@ defmodule Pow.Postgres.Store do
     query = where(query, [s], fragment("array_length(?, 1) = ?", s.key, ^length(key_match)))
 
     key_match
-    |> Enum.with_index(1) # postgres index begins at 1
+    # postgres index begins at 1
+    |> Enum.with_index(1)
     |> Enum.reduce(query, fn {match, index}, query ->
       case match do
         :_ ->
           query
 
         key ->
-          from s in query, where: fragment("?[?] = ?", s.key, ^index, ^:erlang.term_to_binary(key))
+          from(s in query,
+            where: fragment("?[?] = ?", s.key, ^index, ^:erlang.term_to_binary(key))
+          )
       end
     end)
   end
